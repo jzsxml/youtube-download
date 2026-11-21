@@ -1,0 +1,32 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+*.spec
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Secrets & cookies (never commit)
+cookies.txt
+*cookies*.json
+.env
+.env.*
+
+# Local / debug
+*.log
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
