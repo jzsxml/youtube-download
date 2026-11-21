@@ -29,6 +29,7 @@ class TaskStatus(str, Enum):
     QUEUED = "排队"
     DOWNLOADING = "下载中"
     MERGING = "合并中"
+    PAUSED = "已暂停"
     FINISHED = "完成"
     ERROR = "失败"
     CANCELLED = "已取消"
@@ -61,6 +62,7 @@ class DownloadManager:
     on_log: LogCallback | None = None
     _tasks: dict[str, DownloadTask] = field(default_factory=dict)
     _cancel: dict[str, threading.Event] = field(default_factory=dict)
+    _pause_pending: set[str] = field(default_factory=set, repr=False)
     _executor: ThreadPoolExecutor | None = field(default=None, repr=False)
     _futures: list[Future] = field(default_factory=list, repr=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
@@ -84,6 +86,25 @@ class DownloadManager:
     def _set_status(self, task: DownloadTask, status: TaskStatus) -> None:
         task.status = status
         self._emit(task, force=True)
+
+    def _on_download_stopped(self, task_id: str, task: DownloadTask) -> None:
+        with self._lock:
+            paused = task_id in self._pause_pending
+            if paused:
+                self._pause_pending.discard(task_id)
+        ev = self._cancel.get(task_id)
+        if paused:
+            if ev:
+                ev.clear()
+            task.speed = ""
+            task.eta = ""
+            self._set_status(task, TaskStatus.PAUSED)
+            self._log(f"[{task_id}] 已暂停（点「继续」将断点续传）")
+        else:
+            self._set_status(task, TaskStatus.CANCELLED)
+            self._log(
+                f"[{task_id}] 已取消（未下完部分已保留，点「重试」或再次提交同链接可断点续传）"
+            )
 
     def _resolve_urls(self, url: str, expand_playlist: bool) -> list[str]:
         if not should_expand_playlist(url, expand_playlist):
@@ -156,6 +177,22 @@ class DownloadManager:
     def iter_tasks(self) -> list[DownloadTask]:
         return list(self._tasks.values())
 
+    def count_active_tasks(self) -> tuple[int, int, int]:
+        """(downloading, merging, queued) — 用于关闭窗口前的提示。"""
+        downloading = merging = queued = 0
+        for task in self._tasks.values():
+            if task.status == TaskStatus.DOWNLOADING:
+                downloading += 1
+            elif task.status == TaskStatus.MERGING:
+                merging += 1
+            elif task.status == TaskStatus.QUEUED:
+                queued += 1
+        return downloading, merging, queued
+
+    def has_active_downloads(self) -> bool:
+        d, m, q = self.count_active_tasks()
+        return (d + m + q) > 0
+
     def get_task(self, task_id: str) -> DownloadTask | None:
         return self._tasks.get(task_id)
 
@@ -166,6 +203,7 @@ class DownloadManager:
                 if pred(task):
                     removed.append(tid)
                     self._cancel.pop(tid, None)
+                    self._pause_pending.discard(tid)
                     del self._tasks[tid]
         return removed
 
@@ -173,16 +211,20 @@ class DownloadManager:
         task = self._tasks.get(task_id)
         if not task:
             return False
-        if task.status == TaskStatus.DOWNLOADING:
+        if task.status in (TaskStatus.DOWNLOADING, TaskStatus.MERGING):
             return False
         ev = self._cancel.get(task_id)
         if ev:
             ev.clear()
+        resume = task.status in (TaskStatus.CANCELLED, TaskStatus.PAUSED)
         task.status = TaskStatus.QUEUED
-        task.progress = 0.0
+        if not resume:
+            task.progress = 0.0
+            task.output_path = ""
         task.speed = ""
         task.error = ""
-        task.output_path = ""
+        with self._lock:
+            self._pause_pending.discard(task_id)
         self._emit(task, force=True)
         with self._lock:
             if self._executor is None:
@@ -190,17 +232,47 @@ class DownloadManager:
             self._futures.append(self._executor.submit(self._run_one, task_id))
         return True
 
+    def resume_task(self, task_id: str) -> bool:
+        return self.retry_task(task_id)
+
+    def pause_task(self, task_id: str) -> bool:
+        task = self._tasks.get(task_id)
+        if not task:
+            return False
+        if task.status not in (
+            TaskStatus.QUEUED,
+            TaskStatus.DOWNLOADING,
+            TaskStatus.MERGING,
+        ):
+            return False
+        with self._lock:
+            self._pause_pending.add(task_id)
+        if task.status == TaskStatus.QUEUED:
+            self._set_status(task, TaskStatus.PAUSED)
+            return True
+        ev = self._cancel.get(task_id)
+        if ev:
+            ev.set()
+        return True
+
     def cancel_task(self, task_id: str) -> None:
+        with self._lock:
+            self._pause_pending.discard(task_id)
         ev = self._cancel.get(task_id)
         if ev:
             ev.set()
         task = self._tasks.get(task_id)
         if task and task.status not in (TaskStatus.FINISHED, TaskStatus.ERROR):
-            task.status = TaskStatus.CANCELLED
-            self._emit(task)
+            if task.status not in (TaskStatus.DOWNLOADING, TaskStatus.MERGING):
+                task.status = TaskStatus.CANCELLED
+                self._emit(task, force=True)
 
     def _run_one(self, task_id: str) -> None:
-        task = self._tasks[task_id]
+        task = self._tasks.get(task_id)
+        if not task:
+            return
+        if task.status == TaskStatus.PAUSED:
+            return
         cancel = self._cancel[task_id]
         self._set_status(task, TaskStatus.DOWNLOADING)
         self._log(f"[{task_id}] 开始: {task.url}")
@@ -236,17 +308,20 @@ class DownloadManager:
                     task.title = info.get("title") or task.url
                     self._emit(task, force=True)
                 ydl.download([task.url])
+                if info and not cancel.is_set():
+                    try:
+                        task.output_path = ydl.prepare_filename(info)
+                    except Exception:
+                        pass
             if cancel.is_set():
-                self._set_status(task, TaskStatus.CANCELLED)
-                self._log(f"[{task_id}] 已取消")
+                self._on_download_stopped(task_id, task)
             else:
                 self._set_status(task, TaskStatus.FINISHED)
                 task.progress = 100.0
                 self._emit(task, force=True)
                 self._log(f"[{task_id}] 完成: {task.title}")
         except yt_dlp.utils.DownloadCancelled:
-            self._set_status(task, TaskStatus.CANCELLED)
-            self._log(f"[{task_id}] 已取消")
+            self._on_download_stopped(task_id, task)
         except Exception as e:
             err = strip_ansi(str(e))
             if "requested format is not available" in err.lower():

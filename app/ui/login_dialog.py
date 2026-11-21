@@ -132,6 +132,8 @@ class WebLoginDialog(QDialog):
     def __init__(self, parent=None, target_video_url: str | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("登录 YouTube")
+        if parent is not None and not parent.windowIcon().isNull():
+            self.setWindowIcon(parent.windowIcon())
         self.resize(900, 640)
         self._saved_count = 0
         self._target_url = target_video_url

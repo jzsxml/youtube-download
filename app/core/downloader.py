@@ -35,6 +35,8 @@ def build_ydl_opts(
         "progress_hooks": [],
         "retries": 10,
         "fragment_retries": 10,
+        "continuedl": True,
+        "nopart": False,
         "concurrent_fragment_downloads": 3,
         "noprogress": True,
     }

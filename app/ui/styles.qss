@@ -27,7 +27,7 @@ QFrame#card {
     border-radius: 8px;
 }
 
-QLineEdit, QPlainTextEdit, QComboBox, QSpinBox {
+QLineEdit, QPlainTextEdit, QSpinBox, QComboBox {
     background-color: #1a2438;
     border: 1px solid #4a6282;
     border-radius: 6px;
@@ -37,41 +37,51 @@ QLineEdit, QPlainTextEdit, QComboBox, QSpinBox {
     selection-color: #ffffff;
 }
 
-QLineEdit:focus, QPlainTextEdit:focus, QComboBox:focus, QSpinBox:focus {
+QComboBox { padding-right: 28px; min-height: 18px; }
+
+QLineEdit:focus, QPlainTextEdit:focus, QSpinBox:focus,
+QComboBox:focus, QComboBox:on {
     border: 1px solid #5ce1ff;
 }
 
 QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: center right;
+    width: 26px;
     border: none;
-    width: 24px;
+    background: transparent;
 }
 
 QComboBox::down-arrow {
     image: none;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    border-top: 6px solid #e8f0ff;
-    margin-right: 8px;
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid #9eb2cc;
 }
 
 QComboBox QAbstractItemView {
-    background-color: #1e2a40;
-    color: #ffffff;
+    background-color: #151c2e;
+    color: #f0f4fa;
     border: 1px solid #4a6282;
-    selection-background-color: #3d6a9e;
-    selection-color: #ffffff;
+    border-radius: 8px;
+    padding: 6px;
     outline: none;
 }
 
 QComboBox QAbstractItemView::item {
-    min-height: 28px;
-    padding: 4px 8px;
-    color: #ffffff;
+    min-height: 26px;
+    padding: 4px 10px;
+    border-radius: 4px;
+}
+
+QComboBox QAbstractItemView::item:hover {
+    background-color: #243350;
 }
 
 QComboBox QAbstractItemView::item:selected {
-    background-color: #3d6a9e;
-    color: #ffffff;
+    background-color: #2d4a72;
 }
 
 QPushButton {
@@ -153,21 +163,8 @@ QPlainTextEdit#logPanel {
 }
 
 QCheckBox {
-    spacing: 8px;
+    spacing: 6px;
     color: #f0f4fa;
-}
-
-QCheckBox::indicator {
-    width: 16px;
-    height: 16px;
-    border: 1px solid #5a7ab0;
-    border-radius: 3px;
-    background: #1a2438;
-}
-
-QCheckBox::indicator:checked {
-    background: #2d5a85;
-    border-color: #5ce1ff;
 }
 
 QSpinBox::up-button, QSpinBox::down-button {
