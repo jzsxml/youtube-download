@@ -3,7 +3,7 @@ def is_login_required_message(err: str) -> bool:
     markers = (
         "sign in to confirm your age",
         "confirm your age",
-        "sign in",
+        "please sign in",
         "login required",
         "members only",
         "private video",

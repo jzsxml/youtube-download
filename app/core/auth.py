@@ -7,6 +7,7 @@ from app.core.cookie_profiles import get_active_profile_id, profile_cookie_path
 from app.core.cookie_sync import has_session_cookies
 
 _JSON_CONVERT_CACHE: dict[str, str] = {}
+_JSON_CACHE_MAX = 16
 
 
 @dataclass
@@ -31,15 +32,20 @@ class AuthConfig:
     def _custom_file(self) -> Path | None:
         if not self.cookie_path:
             return None
-        path = Path(self.cookie_path)
+        try:
+            path = Path(self.cookie_path).expanduser().resolve()
+        except (OSError, ValueError):
+            return None
         if not path.is_file():
             return None
         if path.suffix.lower() == ".json":
-            cache_key = f"{path.resolve()}:{path.stat().st_mtime_ns}"
+            cache_key = f"{path}:{path.stat().st_mtime_ns}"
             cached = _JSON_CONVERT_CACHE.get(cache_key)
             if cached and Path(cached).is_file():
                 return Path(cached)
             out_path, _ = import_json_cookies(path, save_as_session=False)
+            if len(_JSON_CONVERT_CACHE) >= _JSON_CACHE_MAX:
+                _JSON_CONVERT_CACHE.pop(next(iter(_JSON_CONVERT_CACHE)))
             _JSON_CONVERT_CACHE[cache_key] = str(out_path)
             return out_path
         return path

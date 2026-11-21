@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import uuid
 from dataclasses import dataclass
@@ -175,7 +176,16 @@ def save_profile(
     return CookieProfile(profile_id=profile_id, name=name, created_at=created, source=source, cookie_count=cookie_count)
 
 
+_PROFILE_ID_RE = re.compile(r"^[a-f0-9]{8,32}$")
+
+
+def _valid_profile_id(profile_id: str) -> bool:
+    return bool(_PROFILE_ID_RE.fullmatch(profile_id))
+
+
 def delete_profile(profile_id: str) -> bool:
+    if not _valid_profile_id(profile_id):
+        return False
     rows = _load_index()
     new_rows = [r for r in rows if r.get("profile_id") != profile_id]
     if len(new_rows) == len(rows):
@@ -190,7 +200,7 @@ def delete_profile(profile_id: str) -> bool:
 
 
 def profile_cookie_path(profile_id: str | None) -> Path | None:
-    if not profile_id:
+    if not profile_id or not _valid_profile_id(str(profile_id)):
         return None
     p = get_profile(profile_id)
     if p and p.cookie_file.is_file():

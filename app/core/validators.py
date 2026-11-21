@@ -35,7 +35,7 @@ def normalize_youtube_url(text: str) -> str | None:
         if not host.endswith("youtube.com"):
             return None
     if "watch" in parsed.path or "shorts" in parsed.path or "playlist" in parsed.path:
-        return text.split("&list=")[0] if "watch" in parsed.path else text
+        return text
     if parsed.path.startswith("/shorts/"):
         vid = parsed.path.split("/")[-1]
         return f"https://www.youtube.com/watch?v={vid}"

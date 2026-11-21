@@ -15,6 +15,9 @@ class CookieImportError(ValueError):
     pass
 
 
+MAX_COOKIE_JSON_BYTES = 10 * 1024 * 1024
+
+
 def _normalize_domain(domain: str, host_only: bool = False) -> str:
     domain = (domain or "").strip()
     if not domain:
@@ -99,6 +102,11 @@ def _unwrap_json_root(data) -> list:
 
 def import_json_cookies(path: Path, save_as_session: bool = True) -> tuple[Path, int]:
     """Import browser-exported JSON cookies; save as Netscape cookies.txt for yt-dlp."""
+    if not path.is_file():
+        raise CookieImportError("文件不存在")
+    size = path.stat().st_size
+    if size > MAX_COOKIE_JSON_BYTES:
+        raise CookieImportError(f"JSON 过大（>{MAX_COOKIE_JSON_BYTES // (1024 * 1024)}MB）")
     text = path.read_text(encoding="utf-8-sig").strip()
     if not text:
         raise CookieImportError("JSON 文件为空")

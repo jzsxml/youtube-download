@@ -209,7 +209,9 @@ requirements-build.txt
 ## 开发检查
 
 ```powershell
+pip install -r requirements-dev.txt
 python -m compileall -q app
+python -m pytest tests -q
 ```
 
-CI（`.github/workflows/ci.yml`）在 Windows 上对 `app` 执行 `compileall`。
+CI（`.github/workflows/ci.yml`）在 Windows 上执行 `compileall` 与 `pytest`。

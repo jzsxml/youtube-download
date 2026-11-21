@@ -58,6 +58,7 @@ from app.core.errors import is_dpapi_error
 from app.core.ffmpeg_locator import ffmpeg_available, ffmpeg_status_message
 from app.ui.login_dialog import WebLoginDialog
 from app.core.download_manager import DownloadManager, DownloadTask, TaskStatus
+from app.core.safe_paths import is_safe_output_file
 from app.core.validators import normalize_youtube_url
 
 class ManagerBridge(QObject):
@@ -904,7 +905,8 @@ class MainWindow(QMainWindow):
         task = self._manager.get_task(task_id)
         if not task:
             return
-        if task.output_path and Path(task.output_path).is_file():
+        out_dir = Path(self.dir_input.text().strip() or DEFAULT_DOWNLOAD_DIR)
+        if task.output_path and is_safe_output_file(task.output_path, out_dir):
             os.startfile(task.output_path)
             return
         self._open_download_dir()

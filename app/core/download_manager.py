@@ -211,7 +211,11 @@ class DownloadManager:
         task = self._tasks.get(task_id)
         if not task:
             return False
-        if task.status in (TaskStatus.DOWNLOADING, TaskStatus.MERGING):
+        if task.status in (
+            TaskStatus.QUEUED,
+            TaskStatus.DOWNLOADING,
+            TaskStatus.MERGING,
+        ):
             return False
         ev = self._cancel.get(task_id)
         if ev:
@@ -273,7 +277,9 @@ class DownloadManager:
             return
         if task.status == TaskStatus.PAUSED:
             return
-        cancel = self._cancel[task_id]
+        cancel = self._cancel.get(task_id)
+        if cancel is None:
+            return
         self._set_status(task, TaskStatus.DOWNLOADING)
         self._log(f"[{task_id}] 开始: {task.url}")
 
