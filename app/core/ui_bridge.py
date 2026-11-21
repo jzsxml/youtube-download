@@ -17,7 +17,10 @@ class ProgressThrottler:
             return True
         now = time.monotonic()
         with self._lock:
-            prev = self._last.get(task_id, 0.0)
+            if task_id not in self._last:
+                self._last[task_id] = now
+                return True
+            prev = self._last[task_id]
             if now - prev < self._interval:
                 return False
             self._last[task_id] = now
