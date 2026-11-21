@@ -9,6 +9,7 @@ __pycache__/
 dist/
 build/
 *.spec
+!YouTubeDownloader.spec
 
 # IDE
 .idea/
@@ -24,6 +25,9 @@ cookies.txt
 *cookies*.json
 .env
 .env.*
+
+vendor/ffmpeg/*.exe
+vendor/ffmpeg/FFMPEG-NOTICE.txt
 
 # Local / debug
 *.log

@@ -8,7 +8,9 @@ from pathlib import Path
 from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap, QPolygonF
 
-RESOURCES_DIR = Path(__file__).resolve().parent.parent / "resources"
+from app.paths import resources_dir
+
+RESOURCES_DIR = resources_dir()
 ICO_PATH = RESOURCES_DIR / "app.ico"
 
 _APP_ID = "YouTubeDownloader.Desktop.1"

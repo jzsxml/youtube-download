@@ -55,6 +55,7 @@ from app.core.cookie_profiles import (
     set_active_profile_id,
 )
 from app.core.errors import is_dpapi_error
+from app.core.ffmpeg_locator import ffmpeg_available, ffmpeg_status_message
 from app.ui.login_dialog import WebLoginDialog
 from app.core.download_manager import DownloadManager, DownloadTask, TaskStatus
 from app.core.validators import normalize_youtube_url
@@ -321,6 +322,18 @@ class MainWindow(QMainWindow):
             self._setup_tray_icon(app_icon)
 
         self._ensure_manager()
+        self._check_ffmpeg()
+
+    def _check_ffmpeg(self) -> None:
+        self._append_log(ffmpeg_status_message())
+        if not ffmpeg_available():
+            QMessageBox.warning(
+                self,
+                "缺少 FFmpeg",
+                "未找到 ffmpeg，将无法合并高清音视频或导出 mp3。\n\n"
+                "打包版：请用 build.bat 构建，并分发整个文件夹（含 ffmpeg 子目录）。\n"
+                "开发运行：执行 scripts\\fetch_ffmpeg_windows.ps1，或安装系统 ffmpeg。",
+            )
 
     def _setup_tray_icon(self, icon: QIcon) -> None:
         if not QSystemTrayIcon.isSystemTrayAvailable():

@@ -7,8 +7,9 @@ from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
 
 from app.core.cookie_profiles import _read_settings, _write_settings
+from app.paths import ui_dir
 
-THEME_DIR = Path(__file__).resolve().parent / "themes"
+THEME_DIR = ui_dir() / "themes"
 
 
 class ThemeId(str, Enum):
@@ -63,7 +64,7 @@ def apply_theme(app: QApplication, theme: ThemeId) -> None:
     if qss_path.is_file():
         app.setStyleSheet(qss_path.read_text(encoding="utf-8"))
     else:
-        legacy = Path(__file__).resolve().parent / "styles.qss"
+        legacy = ui_dir() / "styles.qss"
         if legacy.is_file():
             app.setStyleSheet(legacy.read_text(encoding="utf-8"))
 

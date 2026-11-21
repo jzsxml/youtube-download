@@ -11,6 +11,7 @@ from app.config import FORMAT_FALLBACK, FORMAT_PRESETS
 from app.core.auth import AuthConfig
 from app.core.cookie_sync import strip_ansi
 from app.core.errors import is_cookie_infrastructure_error, is_format_unavailable
+from app.core.ffmpeg_locator import apply_ffmpeg_to_opts
 
 
 ProgressCallback = Callable[[dict], None]
@@ -40,6 +41,7 @@ def build_ydl_opts(
         "concurrent_fragment_downloads": 3,
         "noprogress": True,
     }
+    apply_ffmpeg_to_opts(opts)
     if shutil.which("node"):
         opts["js_runtimes"] = {"node": {}}
         opts["remote_components"] = ["ejs:github"]
