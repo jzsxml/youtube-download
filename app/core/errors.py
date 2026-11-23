@@ -38,9 +38,29 @@ def is_cookie_infrastructure_error(err: str) -> bool:
         return True
     if "failed to load cookies" in e:
         return True
+    if "does not look like a netscape" in e:
+        return True
     if is_dpapi_error(err):
         return True
     return False
+
+
+def is_video_unavailable_error(err: str) -> bool:
+    e = err.lower()
+    return (
+        "video unavailable" in e
+        or "account associated with this video has been terminated" in e
+        or "this video has been removed" in e
+        or "this video is no longer available" in e
+    )
+
+
+def brief_video_unavailable_message(err: str) -> str:
+    if "terminated" in err.lower():
+        return "视频不可用（上传者账号已停用），YouTube 无法提供下载。"
+    if "removed" in err.lower():
+        return "视频已从 YouTube 删除，无法下载。"
+    return "视频不可用，无法下载。"
 
 
 def format_youtube_auth_hint(err: str, auth_mode: str, has_cookies: bool) -> str:

@@ -1,8 +1,12 @@
-QMainWindow, QWidget#centralRoot {
+QMainWindow, QWidget#centralRoot, QDialog {
     background-color: #eef1f6;
     color: #1a2332;
     font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif;
     font-size: 14px;
+}
+
+QDialog#playlistDialog {
+    background-color: #eef1f6;
 }
 
 QLabel { color: #1a2332; }
@@ -172,6 +176,43 @@ QTableWidget {
 QTableWidget::item { padding: 4px; color: #1a2332; }
 QTableWidget::item:selected { background-color: #d6ebf5; color: #1a2332; }
 
+QListWidget {
+    background-color: #ffffff;
+    alternate-background-color: #f4f7fb;
+    border: 1px solid #c5d0de;
+    border-radius: 6px;
+    color: #1a2332;
+    padding: 4px;
+    outline: none;
+}
+
+QListWidget::item {
+    padding: 6px 8px;
+    border-radius: 4px;
+}
+
+QListWidget::item:selected {
+    background-color: #d6ebf5;
+    color: #1a2332;
+}
+
+QListWidget::item:hover {
+    background-color: #eef4fa;
+}
+
+QListWidget::indicator {
+    width: 18px;
+    height: 18px;
+    border: 1px solid #b8c5d9;
+    border-radius: 4px;
+    background-color: #ffffff;
+}
+
+QListWidget::indicator:checked {
+    background-color: #d6ebf5;
+    border-color: #0d7ea8;
+}
+
 QHeaderView::section {
     background-color: #e8edf4;
     color: #1a2332;
@@ -240,4 +281,33 @@ QToolTip {
     color: #1a2332;
     border: 1px solid #b8c5d9;
     padding: 6px;
+}
+
+QTabWidget::pane {
+    border: 1px solid #c5d0de;
+    border-radius: 6px;
+    background-color: #ffffff;
+    top: -1px;
+}
+
+QTabBar::tab {
+    background-color: #e8edf4;
+    color: #5a6b7c;
+    border: 1px solid #c5d0de;
+    border-bottom: none;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    padding: 8px 16px;
+    margin-right: 4px;
+}
+
+QTabBar::tab:selected {
+    background-color: #ffffff;
+    color: #0d7ea8;
+    border-color: #b8c5d9;
+}
+
+QTabBar::tab:hover:!selected {
+    background-color: #eef4fa;
+    color: #1a2332;
 }

@@ -70,6 +70,9 @@ def apply_theme(app: QApplication, theme: ThemeId) -> None:
 
     pal = app.palette()
     if theme == ThemeId.LIGHT:
+        pal.setColor(QPalette.ColorRole.Window, QColor("#eef1f6"))
+        pal.setColor(QPalette.ColorRole.Base, QColor("#ffffff"))
+        pal.setColor(QPalette.ColorRole.AlternateBase, QColor("#f4f7fb"))
         pal.setColor(QPalette.ColorRole.WindowText, QColor("#1a2332"))
         pal.setColor(QPalette.ColorRole.Text, QColor("#1a2332"))
         pal.setColor(QPalette.ColorRole.ButtonText, QColor("#1a2332"))
@@ -77,6 +80,9 @@ def apply_theme(app: QApplication, theme: ThemeId) -> None:
         pal.setColor(QPalette.ColorRole.ToolTipBase, QColor("#ffffff"))
         pal.setColor(QPalette.ColorRole.ToolTipText, QColor("#1a2332"))
     else:
+        pal.setColor(QPalette.ColorRole.Window, QColor("#0a0e17"))
+        pal.setColor(QPalette.ColorRole.Base, QColor("#121a2a"))
+        pal.setColor(QPalette.ColorRole.AlternateBase, QColor("#171f30"))
         pal.setColor(QPalette.ColorRole.WindowText, QColor("#f2f6fb"))
         pal.setColor(QPalette.ColorRole.Text, QColor("#ffffff"))
         pal.setColor(QPalette.ColorRole.ButtonText, QColor("#ffffff"))

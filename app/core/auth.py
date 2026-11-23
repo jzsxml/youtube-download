@@ -4,6 +4,7 @@ from pathlib import Path
 from app.config import SESSION_COOKIE_FILE
 from app.core.cookie_import import import_json_cookies
 from app.core.cookie_profiles import get_active_profile_id, profile_cookie_path
+from app.core.cookie_files import snapshot_cookie_file
 from app.core.cookie_sync import has_session_cookies
 
 _JSON_CONVERT_CACHE: dict[str, str] = {}
@@ -65,20 +66,29 @@ class AuthConfig:
         if self.mode == "cookiefile":
             path = self._custom_file()
             if path:
-                opts["cookiefile"] = str(path)
+                try:
+                    opts["cookiefile"] = str(snapshot_cookie_file(path))
+                except (OSError, ValueError):
+                    opts["cookiefile"] = str(path)
             return opts
 
         if self.mode in ("session", "profile"):
             path = self._session_path()
             if path:
-                opts["cookiefile"] = str(path)
+                try:
+                    opts["cookiefile"] = str(snapshot_cookie_file(path))
+                except (OSError, ValueError):
+                    opts["cookiefile"] = str(path)
             return opts
 
         if self.mode in ("edge", "chrome"):
             if self.prefer_session_file:
                 meta_path = self._session_path()
                 if meta_path:
-                    opts["cookiefile"] = str(meta_path)
+                    try:
+                        opts["cookiefile"] = str(snapshot_cookie_file(meta_path))
+                    except (OSError, ValueError):
+                        opts["cookiefile"] = str(meta_path)
                     return opts
             opts["cookiesfrombrowser"] = (self.mode,)
             return opts

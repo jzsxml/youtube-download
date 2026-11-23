@@ -57,6 +57,8 @@ from app.core.cookie_profiles import (
 from app.core.errors import is_dpapi_error
 from app.core.ffmpeg_locator import ffmpeg_available, ffmpeg_status_message
 from app.ui.login_dialog import WebLoginDialog
+from app.ui.playlist_dialog import MyPlaylistsDialog
+from app.ui.channel_videos_dialog import ChannelVideosDialog
 from app.core.download_manager import DownloadManager, DownloadTask, TaskStatus
 from app.core.safe_paths import is_safe_output_file
 from app.core.validators import normalize_youtube_url
@@ -118,6 +120,16 @@ class MainWindow(QMainWindow):
         self.url_input.setPlaceholderText("https://www.youtube.com/watch?v=...")
         self.url_input.returnPressed.connect(self._start_download)
         url_row.addWidget(self.url_input, stretch=1)
+        self.btn_my_playlists = QPushButton("我的播放列表…")
+        self.btn_my_playlists.setToolTip("登录后载入个人播放列表，多选批量下载")
+        self.btn_my_playlists.clicked.connect(self._open_my_playlists)
+        url_row.addWidget(self.btn_my_playlists)
+        self.btn_channel_videos = QPushButton("频道视频…")
+        self.btn_channel_videos.setToolTip(
+            "浏览频道视频与 Shorts，分页勾选后批量下载（每页最多 100 条）"
+        )
+        self.btn_channel_videos.clicked.connect(self._open_channel_videos)
+        url_row.addWidget(self.btn_channel_videos)
         self.btn_download = QPushButton("开始下载", objectName="primaryBtn")
         self.btn_download.clicked.connect(self._start_download)
         url_row.addWidget(self.btn_download)
@@ -261,6 +273,12 @@ class MainWindow(QMainWindow):
 
         list_toolbar = QHBoxLayout()
         list_toolbar.setSpacing(6)
+        self.btn_pause_all = QPushButton("全部暂停")
+        self.btn_pause_all.setToolTip("暂停列表中所有排队、下载中、合并中的任务")
+        self.btn_pause_all.clicked.connect(self._pause_all_tasks)
+        self.btn_resume_all = QPushButton("全部开始")
+        self.btn_resume_all.setToolTip("继续所有已暂停的任务（断点续传）")
+        self.btn_resume_all.clicked.connect(self._resume_all_tasks)
         self.btn_clear_done = QPushButton("清除已完成")
         self.btn_clear_done.clicked.connect(self._clear_finished_tasks)
         self.btn_clear_all = QPushButton("清空列表")
@@ -269,6 +287,8 @@ class MainWindow(QMainWindow):
         self.btn_retry_failed.clicked.connect(self._retry_failed_tasks)
         list_toolbar.addWidget(QLabel("下载列表"))
         list_toolbar.addStretch()
+        list_toolbar.addWidget(self.btn_pause_all)
+        list_toolbar.addWidget(self.btn_resume_all)
         list_toolbar.addWidget(self.btn_clear_done)
         list_toolbar.addWidget(self.btn_retry_failed)
         list_toolbar.addWidget(self.btn_clear_all)
@@ -694,6 +714,75 @@ class MainWindow(QMainWindow):
         os.makedirs(path, exist_ok=True)
         os.startfile(path)
 
+    def _auth_ready_for_private(self) -> bool:
+        mode = self.auth_combo.currentData()
+        if mode == "profile" and not list_profiles():
+            QMessageBox.warning(
+                self,
+                "无 Cookie 配置",
+                "载入个人列表需要登录。\n请先保存 Cookie 配置，或改选「当前会话」。",
+            )
+            return False
+        if mode == "session" and not has_session_cookies():
+            QMessageBox.warning(
+                self,
+                "尚未同步登录",
+                "请先「在应用内登录」或导入 Cookie，再载入个人播放列表。",
+            )
+            return False
+        if mode == "none":
+            QMessageBox.warning(
+                self,
+                "需要登录",
+                "个人播放列表与「稍后观看」需要已登录 Cookie。\n请登录后选择「已保存 Cookie 配置」或「当前会话」。",
+            )
+            return False
+        return True
+
+    @Slot()
+    def _open_my_playlists(self) -> None:
+        if not self._auth_ready_for_private():
+            return
+        self._ensure_manager()
+        auth = self._current_auth()
+        if not auth.cookies_will_be_sent():
+            QMessageBox.warning(
+                self,
+                "Cookie 无效",
+                "当前登录态下没有可用 Cookie 文件，请重新登录或选择有效配置。",
+            )
+            return
+        dlg = MyPlaylistsDialog(auth, parent=self)
+        dlg.playlists_chosen.connect(self._enqueue_chosen_playlists)
+        dlg.exec()
+
+    @Slot(list)
+    def _enqueue_chosen_playlists(self, urls: list) -> None:
+        if not urls:
+            return
+        self._ensure_manager()
+        assert self._manager is not None
+        self._append_log(f"批量下载 {len(urls)} 个播放列表（展开列表={self.chk_playlist.isChecked()}）")
+        self._manager.enqueue_many_async(
+            urls, expand_playlist=True
+        )
+
+    @Slot()
+    def _open_channel_videos(self) -> None:
+        self._ensure_manager()
+        dlg = ChannelVideosDialog(self._current_auth(), parent=self)
+        dlg.videos_chosen.connect(self._enqueue_chosen_videos)
+        dlg.exec()
+
+    @Slot(list)
+    def _enqueue_chosen_videos(self, urls: list) -> None:
+        if not urls:
+            return
+        self._ensure_manager()
+        assert self._manager is not None
+        self._append_log(f"批量下载 {len(urls)} 个选中视频")
+        self._manager.enqueue_many_async(urls, expand_playlist=False)
+
     @Slot()
     def _start_download(self) -> None:
         raw = self.url_input.text().strip()
@@ -735,10 +824,24 @@ class MainWindow(QMainWindow):
             self.btn_download.setText("解析中…")
 
     @Slot(str, object)
-    def _on_enqueue_finished(self, _url: str, _ids: object) -> None:
+    def _on_enqueue_finished(self, label: str, _ids: object) -> None:
         self._submit_pending = max(0, self._submit_pending - 1)
         if self._submit_pending == 0:
             self.btn_download.setText("开始下载")
+        ids = _ids if isinstance(_ids, list) else []
+        if "批量播放列表" in str(label):
+            n = len(ids)
+            if n == 0:
+                self._append_log(f"{label}: 未加入任何视频任务")
+                QMessageBox.warning(
+                    self,
+                    "未能展开播放列表",
+                    "没有从所选播放列表加入下载任务。\n\n"
+                    "请确认：① 添加后该行仍为蓝色勾选；② 点了「下载选中播放列表」；\n"
+                    "③ 或把同一链接贴到主页「视频地址」并勾选「展开播放列表」后点「开始下载」。",
+                )
+            else:
+                self._append_log(f"{label}: 已加入 {n} 个视频下载任务，请在下方任务表查看。")
 
     @Slot(object)
     def _on_task_updated(self, task: DownloadTask) -> None:
@@ -870,6 +973,26 @@ class MainWindow(QMainWindow):
         )
         lay.addStretch()
         return wrap
+
+    def _pause_all_tasks(self) -> None:
+        self._ensure_manager()
+        if not self._manager:
+            return
+        n = self._manager.pause_all()
+        if n:
+            self._append_log(f"已全部暂停 {n} 个任务")
+        else:
+            self._append_log("没有可暂停的任务（需为排队/下载中/合并中）")
+
+    def _resume_all_tasks(self) -> None:
+        self._ensure_manager()
+        if not self._manager:
+            return
+        n = self._manager.resume_all()
+        if n:
+            self._append_log(f"已全部继续 {n} 个任务")
+        else:
+            self._append_log("没有已暂停的任务可继续")
 
     def _pause_task(self, task_id: str) -> None:
         if not self._manager:

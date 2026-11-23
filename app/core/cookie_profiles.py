@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import re
 import shutil
+
+from app.core.cookie_files import atomic_copy_cookie_file
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -145,7 +147,7 @@ def save_profile(
     dest_dir = PROFILES_DIR / profile_id
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest_cookie = dest_dir / "cookies.txt"
-    shutil.copy2(src, dest_cookie)
+    atomic_copy_cookie_file(src, dest_cookie)
 
     if cookie_count <= 0 and dest_cookie.stat().st_size > 64:
         cookie_count = max(1, dest_cookie.read_text(encoding="utf-8", errors="replace").count("\n") - 5)
@@ -170,7 +172,7 @@ def save_profile(
     _save_index(rows)
 
     set_active_profile_id(profile_id)
-    shutil.copy2(dest_cookie, SESSION_COOKIE_FILE)
+    atomic_copy_cookie_file(dest_cookie, SESSION_COOKIE_FILE)
     SESSION_META_FILE.write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
     return CookieProfile(profile_id=profile_id, name=name, created_at=created, source=source, cookie_count=cookie_count)

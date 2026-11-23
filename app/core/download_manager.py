@@ -18,10 +18,12 @@ from app.core.ui_bridge import ProgressThrottler
 from app.core.downloader import build_ydl_opts, build_ydl_opts_with_format, extract_urls_from_playlist
 from app.core.validators import should_expand_playlist
 from app.core.errors import (
+    brief_video_unavailable_message,
     format_youtube_auth_hint,
     is_cookie_infrastructure_error,
     is_format_unavailable,
     is_login_required_message,
+    is_video_unavailable_error,
 )
 
 
@@ -174,6 +176,35 @@ class DownloadManager:
 
         self._submit_executor.submit(work)
 
+    def enqueue_many_async(self, urls: list[str], expand_playlist: bool = True) -> None:
+        """Parse and enqueue multiple playlist URLs on a background thread."""
+        urls = [u.strip() for u in urls if u and u.strip()]
+        if not urls:
+            return
+        label = f"批量播放列表 ({len(urls)} 个)"
+        if self.on_enqueue_started:
+            self.on_enqueue_started(label)
+        with self._lock:
+            if self._submit_executor is None:
+                self._submit_executor = ThreadPoolExecutor(max_workers=1)
+
+        def work() -> None:
+            all_ids: list[str] = []
+            try:
+                for url in urls:
+                    self._log(f"解析播放列表: {url[:80]}…")
+                    merged = self._resolve_urls(url, expand_playlist)
+                    all_ids.extend(self._enqueue_urls(merged))
+                self._log(f"已从 {len(urls)} 个列表加入 {len(all_ids)} 个下载任务")
+                if self.on_enqueue_finished:
+                    self.on_enqueue_finished(label, all_ids)
+            except Exception as e:
+                self._log(f"批量提交失败: {strip_ansi(str(e))}")
+                if self.on_enqueue_finished:
+                    self.on_enqueue_finished(label, all_ids)
+
+        self._submit_executor.submit(work)
+
     def iter_tasks(self) -> list[DownloadTask]:
         return list(self._tasks.values())
 
@@ -238,6 +269,28 @@ class DownloadManager:
 
     def resume_task(self, task_id: str) -> bool:
         return self.retry_task(task_id)
+
+    def pause_all(self) -> int:
+        """Pause every queued / active task."""
+        n = 0
+        for task in list(self._tasks.values()):
+            if self.pause_task(task.task_id):
+                n += 1
+        if n:
+            self._log(f"已全部暂停 {n} 个任务")
+        return n
+
+    def resume_all(self) -> int:
+        """Resume every paused task (断点续传)."""
+        n = 0
+        for task in list(self._tasks.values()):
+            if task.status != TaskStatus.PAUSED:
+                continue
+            if self.resume_task(task.task_id):
+                n += 1
+        if n:
+            self._log(f"已全部继续 {n} 个任务")
+        return n
 
     def pause_task(self, task_id: str) -> bool:
         task = self._tasks.get(task_id)
@@ -330,6 +383,11 @@ class DownloadManager:
             self._on_download_stopped(task_id, task)
         except Exception as e:
             err = strip_ansi(str(e))
+            if is_video_unavailable_error(err):
+                task.error = brief_video_unavailable_message(err)
+                self._set_status(task, TaskStatus.ERROR)
+                self._log(f"[{task_id}] 不可用: {task.error}")
+                return
             if "requested format is not available" in err.lower():
                 self._log(f"[{task_id}] 当前画质不可用，改用通用格式重试…")
                 try:

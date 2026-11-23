@@ -29,6 +29,24 @@ def test_retry_blocks_while_queued(manager: DownloadManager) -> None:
     assert manager.retry_task(task_id) is False
 
 
+@patch.object(DownloadManager, "_run_one", lambda *a, **k: None)
+def test_pause_all_and_resume_all(manager: DownloadManager) -> None:
+    for tid in ("bulk_a", "bulk_b"):
+        manager._tasks[tid] = DownloadTask(
+            task_id=tid, url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        )
+        manager._tasks[tid].status = TaskStatus.QUEUED
+        manager._cancel[tid] = Event()
+    manager._tasks["bulk_done"] = DownloadTask(
+        task_id="bulk_done", url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    )
+    manager._tasks["bulk_done"].status = TaskStatus.FINISHED
+    assert manager.pause_all() == 2
+    assert all(manager._tasks[t].status == TaskStatus.PAUSED for t in ("bulk_a", "bulk_b"))
+    assert manager.resume_all() == 2
+    manager.shutdown(wait=False)
+
+
 def test_pause_queued_becomes_paused(manager: DownloadManager) -> None:
     task_id = "pausetest"
     task = DownloadTask(task_id=task_id, url="https://www.youtube.com/watch?v=dQw4w9WgXcQ")

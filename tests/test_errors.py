@@ -3,6 +3,7 @@ from app.core.errors import (
     is_cookie_infrastructure_error,
     is_format_unavailable,
     is_login_required_message,
+    is_video_unavailable_error,
 )
 
 
@@ -27,3 +28,16 @@ def test_auth_hint_appends_for_age() -> None:
     base = "Sign in to confirm your age"
     out = format_youtube_auth_hint(base, "none", False)
     assert "年龄" in out or "登录" in out
+
+
+def test_netscape_cookie_error() -> None:
+    err = "does not look like a Netscape format cookies file"
+    assert is_cookie_infrastructure_error(err) is True
+
+
+def test_terminated_account_unavailable() -> None:
+    err = (
+        "Video unavailable. This video is no longer available "
+        "because the YouTube account associated with this video has been terminated."
+    )
+    assert is_video_unavailable_error(err) is True

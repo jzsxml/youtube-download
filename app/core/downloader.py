@@ -12,6 +12,7 @@ from app.core.auth import AuthConfig
 from app.core.cookie_sync import strip_ansi
 from app.core.errors import is_cookie_infrastructure_error, is_format_unavailable
 from app.core.ffmpeg_locator import apply_ffmpeg_to_opts
+from app.core.ydl_auth import _YdlQuietLogger, apply_auth_youtube_opts
 
 
 ProgressCallback = Callable[[dict], None]
@@ -40,6 +41,7 @@ def build_ydl_opts(
         "nopart": False,
         "concurrent_fragment_downloads": 3,
         "noprogress": True,
+        "logger": _YdlQuietLogger(),
     }
     apply_ffmpeg_to_opts(opts)
     if shutil.which("node"):
@@ -89,7 +91,7 @@ def _extract_playlist_info(url: str, auth: AuthConfig):
         "extract_flat": "in_playlist",
         "skip_download": True,
     }
-    auth.apply_to_ydl_opts(opts)
+    apply_auth_youtube_opts(auth, opts)
     with yt_dlp.YoutubeDL(opts) as ydl:
         return ydl.extract_info(url, download=False)
 
@@ -111,7 +113,8 @@ def extract_urls_from_playlist(url: str, auth: AuthConfig) -> list[str]:
     if info is None:
         return [url]
     if info.get("_type") == "playlist":
-        entries = info.get("entries") or []
+        raw_entries = info.get("entries") or []
+        entries = list(raw_entries) if not isinstance(raw_entries, list) else raw_entries
         urls: list[str] = []
         for e in entries:
             if e is None:
@@ -120,5 +123,13 @@ def extract_urls_from_playlist(url: str, auth: AuthConfig) -> list[str]:
                 urls.append(e["url"])
             elif e.get("id"):
                 urls.append(f"https://www.youtube.com/watch?v={e['id']}")
-        return urls if urls else [url]
+        if urls:
+            return urls
+        pc = info.get("playlist_count") or info.get("n_entries")
+        if pc and int(pc) > 0:
+            raise RuntimeError(
+                f"播放列表约有 {pc} 个视频，但未能展开条目。"
+                "请检查 Cookie / 登录态，或把链接贴到主页地址栏单独下载。"
+            )
+        return [url]
     return [url]
